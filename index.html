@@ -1,0 +1,412 @@
+<script type="module">
+    // import kaboom lib
+    import kaboom from "https://unpkg.com/kaboom@3000.0.1/dist/kaboom.mjs";
+    
+    // initialize kaboom context
+    kaboom();
+
+
+    //Sprite
+    loadSprite("0", "https://i.imgur.com/fXNxiZk.png");
+    loadSprite("1", "https://i.imgur.com/gHVTNgh.png");
+    loadSprite("2", "https://i.imgur.com/KLfgjyG.png");
+    loadSprite("3", "https://i.imgur.com/VEVV5SS.png");
+    loadSprite("4", "https://i.imgur.com/IN6jGYK.png");
+    loadSprite("5", "https://i.imgur.com/X5eQPSy.png");
+    loadSprite("6", "https://i.imgur.com/RwqcNJI.png");
+    loadSprite("7", "https://i.imgur.com/FBPlrvK.png");
+    loadSprite("8", "https://i.imgur.com/tXkFvFG.png");
+    loadSprite("9", "https://i.imgur.com/U9XmGmf.png");
+    loadSprite("10", "https://i.imgur.com/77x5TdL.png");
+
+//Scene game
+scene("game", () => {
+
+    setGravity(700)
+    setBackground(0,0,0)
+    //Tableau des fruits disponibles
+    const fruits = [{id: 0, tag: "apple", size: 0.05, color: {r: 255, g: 0, b: 0}, sprite: "0"},
+                {id: 1, tag: "orange", size: 0.10, color: {r: 255, g: 165, b: 0}, sprite: "1"},
+                {id: 2, tag: "banana", size: 0.15, color: {r: 255, g: 255, b: 0}, sprite: "2"},
+                {id: 3, tag: "watermelon", size: 0.20, color: {r: 0, g: 255, b: 0}, sprite: "3"},
+                {id: 4, tag: "grapes", size: 0.25, color: {r: 128, g: 0, b: 128}, sprite: "4"},
+                {id: 5, tag: "strawberry", size: 0.30, color: {r: 255, g: 0, b: 0}, sprite: "5"},
+                {id: 6, tag: "peach", size: 0.35, color: {r: 255, g: 218, b: 185}, sprite: "6"},
+                {id: 7, tag: "pear", size: 0.40, color: {r: 0, g: 0, b: 255}, sprite: "7"},
+                {id: 8, tag: "pineapple", size: 0.45, color: {r: 255, g: 100, b: 255}, sprite: "8"}]
+
+    //Boite
+    //Rectangles de gauche
+    const bordureGauche = add([
+        "bordureBoite",
+        rect(50, height()/1.5),
+        pos(width()/2-width()/4, 100),
+        area(),
+        color(255, 255, 255),
+        body({isStatic: true})
+    ]);
+    //Rectangles de droite
+    const bordureDroite = add([
+        "bordureBoite",
+        rect(50, height()/1.5),
+        pos(width()/2+width()/4, 100),
+        area(),
+        color(255, 255, 255),
+        body({isStatic: true})
+    ]);
+    //Rectangles du bas
+    const bordureBas = add([
+        "bordureBoite",
+        rect((width()/4)*2, 50),
+        pos(width()/2-width()/4, height()/1.357),
+        area(),
+        color(255, 255, 255),
+        body({isStatic: true})
+    ]);
+
+    //Player
+    const player = add([
+        "player",
+        rect(50, 50),
+        opacity(0),
+        pos(width()/2, bordureBas.pos.y - bordureDroite.height - 25),
+        area(),
+        color(0, 0, 0),
+        {
+            fruitActuel : NaN,
+            prochainFruit : NaN,
+            score : 0,
+            nombreDeCoup : 0
+        }
+    ]);
+
+    //Ligne de limite du panier en haut
+    const ligneLimite = add([
+        "ligneLimite",
+        rect(width()/2, 5),
+        pos(width()/2-width()/4, bordureBas.pos.y - bordureDroite.height + 50),
+        color(18, 18, 18),
+    ]);
+
+    //Ligne de visée
+    const ligneVisee = add([
+    "ligneVisee",
+    rect(5, height()/1.6),
+    pos(player.pos.x + player.width/2 - 5/2, player.pos.y + player.height/2 + 10),
+    area(),
+    color(255, 255, 255),
+    ]);
+
+    //Score
+    const score = add([
+        text("Score : " + player.score),
+        pos(10, 10),
+        scale(1),
+        color(255, 255, 255)
+    ]);
+
+    //Affichage du prochain fruit
+    const modeleProchainFruit = add([
+        "modeleProchainFruit",
+        sprite("0"),
+        scale(0.2),
+        pos(width()-width()/4, 5),
+    ]);
+
+    const textBeta = add([
+        text("Contient des bugs"),
+        pos(width()-150, height()-50),
+        scale(0.3),
+        color(255, 255, 255)
+    ]);
+
+    const textInstructionTouche = add([
+        //Avec des symboles
+        text("arrows : Move \r space : drop "),
+        pos(width()/2-300, height()-50),
+        scale(0.4),
+        color(255, 255, 255)
+    ]);
+
+    //Movement gauche droite quand on appuie sur les touches fléchées
+    onKeyDown("left", () => {
+        if(player.pos.x > bordureGauche.pos.x + bordureGauche.width/2 + player.width/2){
+            player.move(-200, 0);
+            ligneVisee.move(-200, 0);
+            player.fruitActuel.move(-200, 0);
+        }
+    });
+    onKeyDown("right", () => {
+        if(player.pos.x < bordureDroite.pos.x - bordureDroite.width/2 - player.width/2){
+            player.move(200, 0);
+            ligneVisee.move(200, 0);
+            player.fruitActuel.move(200, 0);
+        }
+    });
+
+    onKeyPress("space", () =>{
+        //Application d'un body au fruit actuel
+        player.fruitActuel.use(body({}));
+        player.fruitActuel.dropped = true;
+        newFruitActuel(player.prochainFruit);
+        player.nombreDeCoup++;
+        choixProchainFruit();
+    })
+
+    onLoad(() =>{
+        //Initialisation du fruit actuel
+        newFruitActuel(0);
+        choixProchainFruit();
+    })
+
+
+
+    //Fonction qui permet de changer le fruit actuel
+    function newFruitActuel(indexFruit){
+        console.log(indexFruit);
+        player.fruitActuel = add([
+            fruits[indexFruit].tag,
+            "fruit",
+            //circle(fruits[indexFruit].size),
+            sprite(fruits[indexFruit].sprite),
+            scale(fruits[indexFruit].size),
+            anchor("center"),
+            //rotation random
+            rotate(rand(0, 360)),
+            pos(player.pos.x + player.width/2 - 5/2, player.pos.y + player.height/2 + 10),
+            area({scale : 0.8}),
+            color(fruits[indexFruit].color.r, fruits[indexFruit].color.g, fruits[indexFruit].color.b),
+            {dropped : false, evolued : false}
+        ]);
+
+        // player.fruitActuel.onCollide("bordureBoite", (objet2)=>{
+        // if(player.fruitActuel.dropped == true && objet2.dropped == true){
+        //     //Destroy
+        //     let posObjet1 = player.fruitActuel.pos;
+        //     let indexObjet1 = findFruitIndex("apple");
+        //     player.fruitActuel.destroy();
+        //     objet2.destroy();
+        //     //Création du nouveau fruit
+        //     if(objet1.evolued == false && objet2.evolued == false){
+        //         objet1.evolued = true;
+        //         fruitEvolution(indexObjet1, posObjet1);
+        //     }
+        // }
+
+        // });
+    }
+
+    function choixProchainFruit(){
+        if(player.nombreDeCoup > 4){
+            player.prochainFruit = Math.floor(rand(0, (fruits.length-1)/2));
+        }
+        else{
+            player.prochainFruit = 0;
+        }
+        updateProchainFruit();
+    }
+
+    function fruitEvolution(indexFruit, position){
+        console.log(fruits[indexFruit+1].tag);
+        if(indexFruit != fruits.length-1){
+            add([
+                fruits[indexFruit+1].tag,
+                "fruit",
+                //circle(fruits[indexFruit+1].size),
+                sprite(fruits[indexFruit+1].sprite),
+                scale(fruits[indexFruit+1].size),
+                anchor("center"),
+                //rotation random
+                rotate(rand(0, 360)),
+                pos(position.x, position.y),
+                area({scale : 0.8}),
+                body({}),
+                color(fruits[indexFruit+1].color.r, fruits[indexFruit+1].color.g, fruits[indexFruit+1].color.b),
+                {dropped : true, evolued : false}
+            ]);
+            player.score += (indexFruit+1) * 100;
+            updateScore();
+        }
+    }
+
+    
+
+
+    function findFruitIndex(tag){
+        var index = 0;
+        for(var i = 0; i < fruits.length; i++){
+            if(fruits[i].tag == tag){
+                index = i;
+            }
+        }
+        return index;
+    }
+
+    function updateScore(){
+        score.text = "Score : " + player.score;
+    }
+
+    function updateProchainFruit(){
+        modeleProchainFruit.use(sprite(fruits[player.prochainFruit].sprite));
+    }
+
+    function verifFruitHorsPanier(fruit){
+        //Vérifier si le fruit est au dessus du panier en Y
+        if(fruit.pos.y < bordureBas.pos.y - bordureBas.height - fruit.height - 50){
+            console.log("Fruit hors panier");
+            go("game")
+        }
+
+    }
+
+    collisionUpdate()
+
+    function collisionUpdate(){
+        //Collision entre les fruits
+
+    onCollide("fruit", "fruit", (objet1, objet2)=>{
+        if(objet1.dropped == true && objet2.dropped == true){
+            //Après 2 secondes d'attente vérifier verifFruitHorsPanier(objet1) et verifFruitHorsPanier(objet2)
+            wait(2, ()=>{
+                verifFruitHorsPanier(objet1);
+                verifFruitHorsPanier(objet2);
+            })
+        }
+        
+    });
+
+    onCollide("apple", "apple", (objet1, objet2)=>{
+        //Si il possède un body, on le supprime
+        if(objet1.dropped == true && objet2.dropped == true){
+            //Destroy
+            let posObjet1 = objet1.pos;
+            let indexObjet1 = findFruitIndex("apple");
+            objet1.destroy();
+            objet2.destroy();
+            //Création du nouveau fruit
+            if(objet1.evolued == false && objet2.evolued == false){
+                objet1.evolued = true;
+                fruitEvolution(indexObjet1, posObjet1);
+            }
+        }
+    });
+
+    onCollide("orange", "orange", (objet1, objet2)=>{
+        //Si il possède un body, on le supprime
+        if(objet1.dropped == true && objet2.dropped == true){
+            //Destroy
+            let posObjet1 = objet1.pos;
+            let indexObjet1 = findFruitIndex("orange");
+            objet1.destroy();
+            objet2.destroy();
+            //Création du nouveau fruit
+            if(objet1.evolued == false && objet2.evolued == false){
+                objet1.evolued = true;
+                fruitEvolution(indexObjet1, posObjet1);
+            }
+        }
+    });
+
+    onCollide("banana", "banana", (objet1, objet2)=>{
+        //Si il possède un body, on le supprime
+        if(objet1.dropped == true && objet2.dropped == true){
+            //Destroy
+            let posObjet1 = objet1.pos;
+            let indexObjet1 = findFruitIndex("banana");
+            objet1.destroy();
+            objet2.destroy();
+            //Création du nouveau fruit
+            if(objet1.evolued == false && objet2.evolued == false){
+                objet1.evolued = true;
+                fruitEvolution(indexObjet1, posObjet1);
+            }
+        }
+    });
+
+    onCollide("watermelon", "watermelon", (objet1, objet2)=>{
+        //Si il possède un body, on le supprime
+        if(objet1.dropped == true && objet2.dropped == true){
+            //Destroy
+            let posObjet1 = objet1.pos;
+            let indexObjet1 = findFruitIndex("watermelon");
+            objet1.destroy();
+            objet2.destroy();
+            //Création du nouveau fruit
+            if(objet1.evolued == false && objet2.evolued == false){
+                objet1.evolued = true;
+                fruitEvolution(indexObjet1, posObjet1);
+            }
+        }
+    });
+
+    onCollide("grapes", "grapes", (objet1, objet2)=>{
+        //Si il possède un body, on le supprime
+        if(objet1.dropped == true && objet2.dropped == true){
+            //Destroy
+            let posObjet1 = objet1.pos;
+            let indexObjet1 = findFruitIndex("grapes");
+            objet1.destroy();
+            objet2.destroy();
+            //Création du nouveau fruit
+            if(objet1.evolued == false && objet2.evolued == false){
+                objet1.evolued = true;
+                fruitEvolution(indexObjet1, posObjet1);
+            }
+        }
+    });
+
+    onCollide("strawberry", "strawberry", (objet1, objet2)=>{
+        //Si il possède un body, on le supprime
+        if(objet1.dropped == true && objet2.dropped == true){
+            //Destroy
+            let posObjet1 = objet1.pos;
+            let indexObjet1 = findFruitIndex("strawberry");
+            objet1.destroy();
+            objet2.destroy();
+            //Création du nouveau fruit
+            if(objet1.evolued == false && objet2.evolued == false){
+                objet1.evolued = true;
+                fruitEvolution(indexObjet1, posObjet1);
+            }
+        }
+    });
+
+    onCollide("peach", "peach", (objet1, objet2)=>{
+        //Si il possède un body, on le supprime
+        if(objet1.dropped == true && objet2.dropped == true){
+            //Destroy
+            let posObjet1 = objet1.pos;
+            let indexObjet1 = findFruitIndex("peach");
+            objet1.destroy();
+            objet2.destroy();
+            //Création du nouveau fruit
+            if(objet1.evolued == false && objet2.evolued == false){
+                objet1.evolued = true;
+                fruitEvolution(indexObjet1, posObjet1);
+            }
+        }
+    });
+
+    onCollide("pear", "pear", (objet1, objet2)=>{
+        //Si il possède un body, on le supprime
+        if(objet1.dropped == true && objet2.dropped == true){
+            //Destroy
+            let posObjet1 = objet1.pos;
+            let indexObjet1 = findFruitIndex("pear");
+            objet1.destroy();
+            objet2.destroy();
+            //Création du nouveau fruit
+            if(objet1.evolued == false && objet2.evolued == false){
+                objet1.evolued = true;
+                fruitEvolution(indexObjet1, posObjet1);
+            }
+        }
+    });
+    }
+});
+
+go("game")
+    
+
+
+    </script>
